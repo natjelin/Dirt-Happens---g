@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<meta name="description" content="__TAGLINE__">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+<style>
+:root{
+  --bg:#f5f2ea; --surface:#ffffff; --ink:#1d2620; --muted:#66705f; --line:#ddd7c8;
+  --brand:#2f5d46; --brand-ink:#ffffff; --chip:#e7eee3; --chip-ink:#2f5d46;
+  --shadow:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141a16; --surface:#1d251f; --ink:#e8eee6; --muted:#9aa595; --line:#2e382f;
+    --brand:#6fb28a; --brand-ink:#0f1a13; --chip:#26332a; --chip-ink:#a9d3b9; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+.app{display:grid;grid-template-columns:minmax(320px,400px) 1fr;height:100vh;height:100dvh}
+.panel{overflow:auto;background:var(--bg);border-right:1px solid var(--line);padding:18px 16px 32px}
+.map-wrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#dfe6d9}
+.map-fallback{margin:0;padding:24px;color:#33402f}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:42vh 1fr;grid-template-rows:42dvh 1fr}
+  .map-wrap{order:-1}
+  .panel{border-right:0;border-top:1px solid var(--line);padding-top:14px}
+}
+
+.brand-row{display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;flex:none;fill:none;stroke:var(--brand);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+h1{margin:0;font-size:25px;line-height:1.1;letter-spacing:-.02em;font-weight:780}
+.tagline{margin:4px 0 0;color:var(--muted)}
+.add-link{display:inline-block;margin-top:8px;color:var(--brand);font-weight:600;text-underline-offset:3px}
+
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 10px}
+.wide{grid-column:1/-1}
+.field{display:grid;gap:4px;margin:0}
+.field>span,.range legend,.label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+.range{border:0;padding:0;margin:0;min-width:0}
+.range legend{padding:0;margin-bottom:4px}
+.pair{display:flex;align-items:center;gap:6px;color:var(--muted)}
+input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0;width:100%}
+input:focus-visible,select:focus-visible,.btn:focus-visible,.chip:focus-visible,.link:focus-visible,.add-link:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.row{display:flex;gap:10px;align-items:end}
+.row .field{flex:1}
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;border-radius:10px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--brand)}
+.btn.small{padding:6px 11px;font-size:13.5px}
+
+.count{font-size:13px;color:var(--muted);margin:6px 0 10px;font-weight:600}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.card{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;box-shadow:var(--shadow)}
+.card:hover{border-color:var(--brand)}
+.card[aria-current="true"]{border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand)}
+.card:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.card-title{font-weight:700;overflow-wrap:anywhere}
+.card-meta{color:var(--muted);font-size:13.5px;margin-top:2px;font-variant-numeric:tabular-nums}
+.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.tag{font-size:12px;background:var(--chip);color:var(--chip-ink);border-radius:999px;padding:2px 9px}
+.empty{padding:22px 6px;color:var(--muted);text-align:center}
+.empty .btn{margin-top:10px}
+
+.back{margin-bottom:12px}
+h2{margin:0;font-size:23px;line-height:1.15;letter-spacing:-.015em;overflow-wrap:anywhere}
+.sub{color:var(--muted);margin:5px 0 0}
+.detail .card-tags{margin:12px 0 0}
+.desc{margin:14px 0 0;overflow-wrap:anywhere}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:16px 0}
+.stat:first-child{grid-column:1/-1}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.stat dt{font-size:12px;color:var(--muted);font-weight:600}
+.stat dd{margin:1px 0 0;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.profile-title{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 6px}
+canvas.profile{width:100%;height:150px;display:block;background:var(--surface);border:1px solid var(--line);border-radius:10px;touch-action:pan-y}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 10px}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel" id="panel">
+    <div id="browse">
+      <header>
+        <div class="brand-row">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 26 12 10l5 8 3-4 9 12z"/><path d="M12 10l2.5 4"/></svg>
+          <h1>__TITLE__</h1>
+        </div>
+        <p class="tagline">__TAGLINE__</p>
+        <a id="add-route" class="add-link" hidden target="_blank" rel="noopener">Add a route</a>
+      </header>
+
+      <div class="filters" role="search">
+        <label class="field wide"><span>Search</span><input id="q" type="search" placeholder="Name, tag or runner"></label>
+        <fieldset class="range"><legend>Distance (km)</legend>
+          <div class="pair"><input id="dmin" type="number" min="0" step="0.5" inputmode="decimal" placeholder="min" aria-label="Minimum distance in kilometres">–<input id="dmax" type="number" min="0" step="0.5" inputmode="decimal" placeholder="max" aria-label="Maximum distance in kilometres"></div>
+        </fieldset>
+        <fieldset class="range"><legend>Climb (m)</legend>
+          <div class="pair"><input id="gmin" type="number" min="0" step="50" inputmode="numeric" placeholder="min" aria-label="Minimum climb in metres">–<input id="gmax" type="number" min="0" step="50" inputmode="numeric" placeholder="max" aria-label="Maximum climb in metres"></div>
+        </fieldset>
+        <div class="wide" id="tags-wrap"><span class="label">Tags</span><div id="tags" class="chips"></div></div>
+        <div class="row wide">
+          <label class="field"><span>Sort by</span>
+            <select id="sort">
+              <option value="name">Name (A–Z)</option>
+              <option value="short">Shortest first</option>
+              <option value="long">Longest first</option>
+              <option value="climb-desc">Most climbing</option>
+              <option value="climb-asc">Least climbing</option>
+              <option value="new">Newest first</option>
+            </select>
+          </label>
+          <button id="reset" type="button" class="btn ghost">Reset filters</button>
+        </div>
+      </div>
+
+      <div id="count" class="count" aria-live="polite"></div>
+      <ul id="list" class="list"></ul>
+    </div>
+
+    <div id="detail" class="detail" hidden></div>
+  </aside>
+  <main class="map-wrap"><div id="map" role="application" aria-label="Map of routes"></div></main>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+<script>
+(() => {
+  'use strict';
+
+  const payload = JSON.parse(document.getElementById('data').textContent);
+  const ROUTES = payload.routes;
+  const byId = new Map(ROUTES.map(r => [r.id, r]));
+  const BASE_TITLE = document.title;
+  const $ = (id) => document.getElementById(id);
+
+  // Route names and descriptions come from files other people contributed, so the page
+  // never uses innerHTML: everything goes through textContent / text nodes.
+  function el(tag, props, ...kids) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (k === 'class') node.className = v;
+      else if (k === 'text') node.textContent = v;
+      else if (v === true) node.setAttribute(k, '');
+      else if (v !== false && v != null) node.setAttribute(k, v);
+    }
+    for (const kid of kids.flat()) if (kid != null) node.append(kid);
+    return node;
+  }
+
+  const fmtKm = (v) => v.toFixed(1) + ' km';
+  const fmtM = (v) => (v == null ? '–' : Math.round(v).toLocaleString() + ' m');
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T12:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+  }
+  for (const r of ROUTES) r._hay = [r.name, r.author, r.description, r.tags.join(' ')].join(' ').toLowerCase();
+
+  // ---------------------------------------------------------------- map
+  const hasMap = typeof L !== 'undefined';
+  const STYLE = {
+    base: {color: '#e4572e', weight: 3, opacity: 0.85},
+    dim: {opacity: 0.3},
+    active: {color: '#4a1d96', weight: 5, opacity: 1},
+  };
+  const lines = new Map();
+  let map = null, group = null, hover = null;
+
+  if (hasMap) {
+    map = L.map('map');
+    const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    });
+    const streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    });
+    topo.addTo(map);
+    L.control.layers({'Topographic': topo, 'Streets': streets}, null, {collapsed: true}).addTo(map);
+    group = L.featureGroup().addTo(map);
+    map.setView([20, 0], 2);
+    for (const r of ROUTES) {
+      const line = L.polyline(r.coords, {...STYLE.base, lineJoin: 'round'});
+      line.bindTooltip(el('span', {text: r.name}), {sticky: true});
+      line.on('click', () => open(r.id));
+      lines.set(r.id, line);
+    }
+  } else {
+    $('map').append(el('p', {class: 'map-fallback', text: 'The map could not be loaded (are you offline?). Searching and downloading routes still works.'}));
+  }
+
+  function fitTo(list) {
+    if (!hasMap || !list.length) return;
+    let bounds = null;
+    for (const r of list) {
+      const b = L.latLngBounds(r.bounds);
+      bounds = bounds ? bounds.extend(b) : b;
+    }
+    map.fitBounds(bounds, {padding: [28, 28], maxZoom: 15});
+  }
+
+  function styleLines() {
+    if (!hasMap) return;
+    for (const [id, line] of lines) {
+      if (!state.selected) line.setStyle(STYLE.base);
+      else if (id === state.selected) { line.setStyle(STYLE.active); line.bringToFront(); }
+      else line.setStyle({...STYLE.base, ...STYLE.dim});
+    }
+  }
+
+  function syncMapToFilter() {
+    if (!hasMap) return;
+    group.clearLayers();
+    for (const r of state.filtered) group.addLayer(lines.get(r.id));
+    if (state.selected && !state.filtered.some(r => r.id === state.selected)) group.addLayer(lines.get(state.selected));
+  }
+
+  function moveHover(p) {
+    if (!hasMap) return;
+    const ll = [p[2], p[3]];
+    if (!hover) hover = L.circleMarker(ll, {radius: 6, color: '#fff', weight: 2, fillColor: '#4a1d96', fillOpacity: 1, interactive: false}).addTo(map);
+    else hover.setLatLng(ll);
+  }
+  function clearHover() { if (hover) { hover.remove(); hover = null; } }
+
+  // ---------------------------------------------------------------- filters
+  const state = {selected: null, q: '', dMin: null, dMax: null, gMin: null, gMax: null, tags: new Set(), sort: 'name', filtered: []};
+  const cmp = (x, y) => (x === y ? 0 : x < y ? -1 : 1);
+  const SORTERS = {
+    name: (a, b) => a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}),
+    short: (a, b) => cmp(a.distance_km, b.distance_km),
+    long: (a, b) => cmp(b.distance_km, a.distance_km),
+    'climb-desc': (a, b) => cmp(b.gain_m ?? -1, a.gain_m ?? -1),
+    'climb-asc': (a, b) => cmp(a.gain_m ?? Infinity, b.gain_m ?? Infinity),
+    new: (a, b) => (b.date || '').localeCompare(a.date || ''),
+  };
+  const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+
+  function readFilters() {
+    state.q = $('q').value.trim().toLowerCase();
+    state.dMin = num('dmin'); state.dMax = num('dmax');
+    state.gMin = num('gmin'); state.gMax = num('gmax');
+    state.sort = $('sort').value;
+  }
+
+  function matches(r, words) {
+    if (!words.every(w => r._hay.includes(w))) return false;
+    if (state.dMin != null && r.distance_km < state.dMin) return false;
+    if (state.dMax != null && r.distance_km > state.dMax) return false;
+    if (state.gMin != null || state.gMax != null) {
+      if (r.gain_m == null) return false;
+      if (state.gMin != null && r.gain_m < state.gMin) return false;
+      if (state.gMax != null && r.gain_m > state.gMax) return false;
+    }
+    for (const t of state.tags) if (!r.tags.includes(t)) return false;
+    return true;
+  }
+
+  const itemEls = new Map();
+  function renderList() {
+    const list = $('list');
+    list.replaceChildren();
+    itemEls.clear();
+    if (!state.filtered.length) {
+      const empty = el('li', {class: 'empty'});
+      if (!ROUTES.length) {
+        empty.append('No routes yet. Add GPX files to the routes folder and rebuild the site.');
+      } else {
+        empty.append('No routes match these filters.', el('br'), el('button', {type: 'button', class: 'btn ghost small'}, 'Reset filters'));
+        empty.querySelector('button').addEventListener('click', resetFilters);
+      }
+      list.append(empty);
+      return;
+    }
+    for (const r of state.filtered) {
+      const meta = [fmtKm(r.distance_km), r.gain_m != null ? '↑ ' + fmtM(r.gain_m) : null, r.author || null].filter(Boolean).join(' · ');
+      const card = el('button', {type: 'button', class: 'card', 'aria-current': state.selected === r.id ? 'true' : 'false'},
+        el('div', {class: 'card-title', text: r.name}),
+        el('div', {class: 'card-meta', text: meta}),
+        r.tags.length ? el('div', {class: 'card-tags'}, r.tags.slice(0, 4).map(t => el('span', {class: 'tag', text: t}))) : null);
+      card.addEventListener('click', () => open(r.id));
+      card.addEventListener('mouseenter', () => {
+        if (!hasMap || state.selected) return;
+        const line = lines.get(r.id);
+        line.setStyle({weight: 6, opacity: 1});
+        line.bringToFront();
+      });
+      card.addEventListener('mouseleave', () => { if (hasMap && !state.selected) lines.get(r.id).setStyle(STYLE.base); });
+      itemEls.set(r.id, card);
+      list.append(el('li', null, card));
+    }
+  }
+
+  function renderCount() {
+    $('count').textContent = ROUTES.length ? `${state.filtered.length} of ${ROUTES.length} routes` : '';
+  }
+
+  function applyFilters(fit) {
+    readFilters();
+    const words = state.q.split(/\s+/).filter(Boolean);
+    state.filtered = ROUTES.filter(r => matches(r, words)).sort(SORTERS[state.sort]);
+    renderList();
+    renderCount();
+    syncMapToFilter();
+    if (fit && !state.selected) fitTo(state.filtered);
+  }
+
+  function resetFilters() {
+    for (const id of ['q', 'dmin', 'dmax', 'gmin', 'gmax']) $(id).value = '';
+    state.tags.clear();
+    for (const chip of document.querySelectorAll('#tags .chip')) chip.setAttribute('aria-pressed', 'false');
+    applyFilters(true);
+  }
+
+  function buildTagChips() {
+    const counts = new Map();
+    for (const r of ROUTES) for (const t of r.tags) counts.set(t, (counts.get(t) || 0) + 1);
+    const tags = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+    $('tags-wrap').hidden = tags.length === 0;
+    for (const t of tags) {
+      const chip = el('button', {type: 'button', class: 'chip', 'aria-pressed': 'false', text: t});
+      chip.addEventListener('click', () => {
+        const on = !state.tags.has(t);
+        if (on) state.tags.add(t); else state.tags.delete(t);
+        chip.setAttribute('aria-pressed', String(on));
+        applyFilters(true);
+      });
+      $('tags').append(chip);
+    }
+  }
+
+  // ---------------------------------------------------------------- detail view
+  const PAD = {l: 40, r: 10, t: 12, b: 22};
+  let redrawProfile = null;
+
+  function drawProfile(canvas, prof, hi) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    const css = getComputedStyle(document.documentElement);
+    const ink = css.getPropertyValue('--ink').trim(), muted = css.getPropertyValue('--muted').trim();
+    const grid = css.getPropertyValue('--line').trim(), brand = css.getPropertyValue('--brand').trim();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const x0 = prof[0][0], x1 = prof[prof.length - 1][0];
+    const es = prof.map(p => p[1]);
+    const eMin = Math.min(...es), eMax = Math.max(...es);
+    const margin = Math.max(10, (eMax - eMin) * 0.1);
+    const step = [10, 20, 25, 50, 100, 200, 250, 500, 1000].find(s => (eMax - eMin + 2 * margin) / s <= 3) || 1000;
+    const y0 = Math.floor((eMin - margin) / step) * step, y1 = Math.ceil((eMax + margin) / step) * step;
+    const X = (v) => PAD.l + (v - x0) / ((x1 - x0) || 1) * (w - PAD.l - PAD.r);
+    const Y = (v) => PAD.t + (1 - (v - y0) / ((y1 - y0) || 1)) * (h - PAD.t - PAD.b);
+
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.lineWidth = 1;
+    for (let v = y0; v <= y1; v += step) {
+      const y = Math.round(Y(v)) + 0.5;
+      ctx.strokeStyle = grid; ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(v), PAD.l - 6, y);
+    }
+    ctx.textBaseline = 'top';
+    for (let i = 0; i <= 4; i++) {
+      const v = x0 + (x1 - x0) * i / 4;
+      ctx.fillStyle = muted;
+      ctx.textAlign = i === 0 ? 'left' : i === 4 ? 'right' : 'center';
+      ctx.fillText(v.toFixed(1) + (i === 4 ? ' km' : ''), X(v), h - PAD.b + 6);
+    }
+
+    ctx.beginPath();
+    prof.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))));
+    ctx.strokeStyle = brand; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.lineTo(X(x1), Y(y0)); ctx.lineTo(X(x0), Y(y0)); ctx.closePath();
+    ctx.globalAlpha = 0.16; ctx.fillStyle = brand; ctx.fill(); ctx.globalAlpha = 1;
+
+    if (hi >= 0) {
+      const p = prof[hi], px = X(p[0]), py = Y(p[1]);
+      ctx.strokeStyle = ink; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, PAD.t); ctx.lineTo(px, h - PAD.b); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = brand; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+      const label = p[0].toFixed(1) + ' km · ' + Math.round(p[1]) + ' m';
+      ctx.fillStyle = ink; ctx.textBaseline = 'top';
+      ctx.textAlign = px > w / 2 ? 'right' : 'left';
+      ctx.fillText(label, px + (px > w / 2 ? -8 : 8), PAD.t + 2);
+    }
+  }
+
+  function attachProfile(canvas, prof) {
+    const draw = (i) => drawProfile(canvas, prof, i);
+    const indexAt = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const t = Math.min(1, Math.max(0, (e.clientX - rect.left - PAD.l) / (rect.width - PAD.l - PAD.r)));
+      const x = prof[0][0] + t * (prof[prof.length - 1][0] - prof[0][0]);
+      let best = 0, bestD = Infinity;
+      prof.forEach((p, i) => { const d = Math.abs(p[0] - x); if (d < bestD) { bestD = d; best = i; } });
+      return best;
+    };
+    canvas.addEventListener('pointermove', (e) => { const i = indexAt(e); draw(i); moveHover(prof[i]); });
+    canvas.addEventListener('pointerleave', () => { draw(-1); clearHover(); });
+    redrawProfile = () => draw(-1);
+    draw(-1);
+  }
+
+  async function copyLink(btn) {
+    try { await navigator.clipboard.writeText(location.href); btn.textContent = 'Link copied'; }
+    catch (_) { window.prompt('Copy this link', location.href); }
+    setTimeout(() => { btn.textContent = 'Copy link'; }, 1600);
+  }
+
+  function renderDetail(r) {
+    const box = $('detail');
+    box.replaceChildren();
+    redrawProfile = null;
+    const back = el('button', {type: 'button', class: 'btn ghost small back'}, '← All routes');
+    back.addEventListener('click', close);
+
+    const sub = [r.author ? 'Added by ' + r.author : null, fmtDate(r.date) || null].filter(Boolean).join(' · ');
+    const stats = [['Distance', fmtKm(r.distance_km)]];
+    if (r.gain_m != null) stats.push(['Climb', '↑ ' + fmtM(r.gain_m)], ['Descent', '↓ ' + fmtM(r.loss_m)], ['Highest point', fmtM(r.max_ele)], ['Lowest point', fmtM(r.min_ele)]);
+
+    const copy = el('button', {type: 'button', class: 'btn ghost'}, 'Copy link');
+    copy.addEventListener('click', () => copyLink(copy));
+    const canvas = r.profile ? el('canvas', {class: 'profile', role: 'img', 'aria-label': 'Elevation profile. Move over it to follow the route on the map.'}) : null;
+
+    box.append(
+      back,
+      el('h2', {text: r.name}),
+      sub ? el('p', {class: 'sub', text: sub}) : null,
+      r.tags.length ? el('div', {class: 'card-tags'}, r.tags.map(t => el('span', {class: 'tag', text: t}))) : null,
+      r.description ? el('p', {class: 'desc', text: r.description}) : null,
+      el('dl', {class: 'stats'}, stats.map(([k, v]) => el('div', {class: 'stat'}, el('dt', {text: k}), el('dd', {text: v})))),
+      canvas ? el('p', {class: 'profile-title', text: 'Elevation profile (metres)'}) : el('p', {class: 'note', text: 'This file has no elevation data.'}),
+      canvas,
+      el('div', {class: 'actions'}, el('a', {class: 'btn', href: r.gpx, download: r.id + '.gpx'}, 'Download GPX'), copy),
+      r.trimmed_m ? el('p', {class: 'note', text: `The first and last ${r.trimmed_m} m of the track are left out, so start and finish points stay private. Distance and climb are for the full route.`}) : null,
+    );
+    if (canvas) attachProfile(canvas, r.profile);
+  }
+
+  // ---------------------------------------------------------------- routing (URL hash = selected route)
+  function syncFromHash() {
+    let id = '';
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (_) { /* malformed hash: show the list */ }
+    const r = byId.get(id) || null;
+    state.selected = r ? r.id : null;
+    $('browse').hidden = !!r;
+    $('detail').hidden = !r;
+    clearHover();
+    syncMapToFilter();
+    if (r) {
+      renderDetail(r);
+      fitTo([r]);
+      document.title = r.name + ' · ' + BASE_TITLE;
+    } else {
+      document.title = BASE_TITLE;
+      fitTo(state.filtered.length ? state.filtered : ROUTES);
+    }
+    for (const [rid, card] of itemEls) card.setAttribute('aria-current', rid === state.selected ? 'true' : 'false');
+    styleLines();
+    $('panel').scrollTop = 0;
+  }
+  function open(id) {
+    if (location.hash === '#' + id) syncFromHash(); else location.hash = id;
+  }
+  function close() {
+    if (location.hash) history.pushState(null, '', location.pathname + location.search);
+    syncFromHash();
+  }
+  window.addEventListener('hashchange', syncFromHash);
+  window.addEventListener('popstate', syncFromHash);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.selected && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) close();
+  });
+  window.addEventListener('resize', () => {
+    if (hasMap) map.invalidateSize();
+    if (redrawProfile) redrawProfile();
+  });
+
+  // ---------------------------------------------------------------- start
+  if (payload.repoUrl) {
+    const link = $('add-route');
+    link.href = payload.repoUrl.replace(/\/+$/, '') + '/blob/HEAD/README.md#add-a-route';
+    link.hidden = false;
+  }
+  let timer = null;
+  for (const id of ['q', 'dmin', 'dmax', 'gmin', 'gmax', 'sort']) {
+    $(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => applyFilters(true), 120); });
+  }
+  $('reset').addEventListener('click', resetFilters);
+  buildTagChips();
+  applyFilters(false);
+  syncFromHash();
+  requestAnimationFrame(() => { if (hasMap) map.invalidateSize(); });
+})();
+</script>
+</body>
+</html>
